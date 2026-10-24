@@ -1,3 +1,13 @@
+## Following upstream releases in this fork
+
+These rules govern upstream updates in this fork and take precedence over the upstream PR branch guidance below.
+
+- Base every update on an official release tag from `https://github.com/traefik/traefik`, such as `v3.7.16`. Verify the tag against the official repository; do not use the tip of `master` or a maintenance branch as the release baseline.
+- Create a branch named exactly after the target version tag, such as `v3.7.16`, starting at that tag. Use fully qualified refs (`refs/tags/v3.7.16` and `refs/heads/v3.7.16`) when needed to distinguish the tag from the branch.
+- Rebase only this fork's local commits onto the new version branch. Use the previous upstream release tag as the boundary when selecting those commits. Do not replay upstream commits or merge the previous release branch into the new branch. Preserve the previous version branch and any uncommitted work; do not reset an existing version branch or rewrite a published branch without explicit authorization.
+- Before accepting the rebased patch, review CONNECT handling in `pkg/server/`, `pkg/server/service/`, `pkg/middlewares/`, and the proxy and transport code, including HTTP/2 and HTTP/3. Search for `CONNECT`, `RoundTrip`, `Hijack`, `keep-alive`, `http2`, and `http3`. Resolve conflicts against the new release's behavior and reassess the patch's assumptions even when the rebase applies cleanly.
+- Keep the CONNECT exception limited to exact matches against nonempty configured header values; unmatched CONNECT requests must still receive 501 before HTTP routing. Run the relevant package tests and required validation, and align the build version and image tag with the target release. Do not automatically carry the patch into a new major version without reviewing the call chain and security assumptions.
+
 # Traefik — Contributor Guide for AI Agents
 
 Traefik is a modern HTTP reverse proxy and load balancer that discovers services from orchestrators (Kubernetes, Docker, Nomad, ...) and wires up routing dynamically. This file is the canonical guide for AI coding agents (Claude Code, Codex, Gemini, Cursor, ...) working in this repository; `CLAUDE.md` is a thin pointer to this file. For everything not covered here, defer to [`CONTRIBUTING.md`](./CONTRIBUTING.md) and [`docs/content/contributing/`](./docs/content/contributing/).

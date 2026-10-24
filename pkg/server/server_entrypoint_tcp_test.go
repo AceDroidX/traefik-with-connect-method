@@ -449,46 +449,53 @@ func Test_denyOpaque(t *testing.T) {
 
 func Test_denyConnect(t *testing.T) {
 	tests := []struct {
-		name       string
-		method     string
-		protoMajor int
-		wantStatus int
+		name        string
+		secret      string
+		auth        string
+		naiveHeader string
+		authHeader  string
+		allowed     bool
 	}{
-		{
-			name:       "Rejects HTTP/1 CONNECT",
-			method:     http.MethodConnect,
-			protoMajor: 1,
-			wantStatus: http.StatusNotImplemented,
-		},
-		{
-			name:       "Rejects HTTP/2 CONNECT",
-			method:     http.MethodConnect,
-			protoMajor: 2,
-			wantStatus: http.StatusNotImplemented,
-		},
-		{
-			name:       "Allows GET",
-			method:     http.MethodGet,
-			protoMajor: 1,
-			wantStatus: http.StatusOK,
-		},
+		{name: "empty configuration"},
+		{name: "empty configuration with headers", naiveHeader: "test-secret", authHeader: "Basic test-auth"},
+		{name: "missing headers", secret: "test-secret", auth: "Basic test-auth"},
+		{name: "wrong naive", secret: "test-secret", naiveHeader: "wrong"},
+		{name: "wrong auth", auth: "Basic test-auth", authHeader: "Basic wrong"},
+		{name: "Basic prefix only", auth: "Basic test-auth", authHeader: "Basic "},
+		{name: "exact naive", secret: "test-secret", naiveHeader: "test-secret", allowed: true},
+		{name: "exact auth", auth: "Basic test-auth", authHeader: "Basic test-auth", allowed: true},
+		{name: "naive with wrong auth", secret: "test-secret", auth: "Basic test-auth", naiveHeader: "test-secret", authHeader: "wrong", allowed: true},
+		{name: "auth with wrong naive", secret: "test-secret", auth: "Basic test-auth", naiveHeader: "wrong", authHeader: "Basic test-auth", allowed: true},
+		{name: "both match", secret: "test-secret", auth: "Basic test-auth", naiveHeader: "test-secret", authHeader: "Basic test-auth", allowed: true},
+		{name: "naive prefix", secret: "test-secret", naiveHeader: "test-secret-extra"},
+		{name: "auth suffix", auth: "Basic test-auth", authHeader: "Basic test-auth-extra"},
 	}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			handler := denyConnect(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-			}))
-
-			req := httptest.NewRequest(test.method, "http://example.com", nil)
-			req.ProtoMajor = test.protoMajor
-			res := httptest.NewRecorder()
-
-			handler.ServeHTTP(res, req)
-
-			assert.Equal(t, test.wantStatus, res.Code)
+			t.Setenv("TRAEFIK_NAIVE_CONNECT_SECRET", test.secret)
+			t.Setenv("TRAEFIK_NAIVE_PROXY_AUTH", test.auth)
+			for _, method := range []string{http.MethodGet, http.MethodConnect} {
+				for _, protoMajor := range []int{1, 2, 3} {
+					called := false
+					handler := denyConnect(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						called = true
+						w.WriteHeader(http.StatusNoContent)
+					}))
+					req := httptest.NewRequest(method, "http://example.com", nil)
+					req.ProtoMajor = protoMajor
+					req.Header.Set("Naive", test.naiveHeader)
+					req.Header.Set("Proxy-Authorization", test.authHeader)
+					res := httptest.NewRecorder()
+					handler.ServeHTTP(res, req)
+					allowed := method != http.MethodConnect || test.allowed
+					assert.Equal(t, allowed, called)
+					if allowed {
+						assert.Equal(t, http.StatusNoContent, res.Code)
+					} else {
+						assert.Equal(t, http.StatusNotImplemented, res.Code)
+					}
+				}
+			}
 		})
 	}
 }

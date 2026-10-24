@@ -1,0 +1,37 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/go .
+{
+	"name": "Go",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	"image": "mcr.microsoft.com/devcontainers/go:2-1.27-trixie",
+	"features": {
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+			"moby": false
+		}
+	},
+	// Rootless Podman exposes its Docker-compatible API in the host runtime directory.
+	"mounts": [
+		{
+			"source": "${localEnv:XDG_RUNTIME_DIR}/podman/podman.sock",
+			"target": "/var/run/docker-host.sock",
+			"type": "bind"
+		},
+		{
+			"source": "codex",
+			"target": "/codex",
+			"type": "volume"
+		}
+	],
+	"containerEnv": {
+		"CODEX_HOME": "/codex"
+	},
+	"postCreateCommand": "curl -fsSL https://chatgpt.com/codex/install.sh | sh"
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	// "features": {},
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+	// Configure tool-specific properties.
+	// "customizations": {},
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "root"
+}

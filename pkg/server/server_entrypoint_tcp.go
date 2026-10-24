@@ -879,11 +879,20 @@ func denyFragment(h http.Handler) http.Handler {
 	})
 }
 
-// denyConnect rejects the CONNECT requests, whatever the HTTP version.
-// CONNECT tunnels are not supported, and forwarding them without a dedicated handling is unsafe.
+// CONNECT tunnels are unsupported, so only explicitly configured NaiveProxy credentials may bypass rejection.
 func denyConnect(h http.Handler) http.Handler {
+	naiveSecret := os.Getenv("TRAEFIK_NAIVE_CONNECT_SECRET")
+	expectedProxyAuth := os.Getenv("TRAEFIK_NAIVE_PROXY_AUTH")
+
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if req.Method == http.MethodConnect {
+			naiveOK := naiveSecret != "" && req.Header.Get("Naive") == naiveSecret
+			authOK := expectedProxyAuth != "" && req.Header.Get("Proxy-Authorization") == expectedProxyAuth
+			if naiveOK || authOK {
+				h.ServeHTTP(rw, req)
+				return
+			}
+
 			log.Debug().Msg("Rejecting CONNECT request: CONNECT tunnels are not supported")
 			rw.WriteHeader(http.StatusNotImplemented)
 
