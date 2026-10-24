@@ -1,3 +1,33 @@
+## Allow NaiveProxy CONNECT Requests (Custom Patch)
+
+This fork of Traefik Proxy v3.7.16 permits CONNECT requests to reach HTTP routing when either of these process environment variables has a nonempty value that exactly matches its request header:
+
+| Environment Variable | Request Header |
+| --- | --- |
+| `TRAEFIK_NAIVE_CONNECT_SECRET` | `naive` |
+| `TRAEFIK_NAIVE_PROXY_AUTH` | `Proxy-Authorization` (the complete value, including `Basic `) |
+
+Set the variables on the Traefik container, for example with Docker Compose:
+
+```yaml
+environment:
+  TRAEFIK_NAIVE_CONNECT_SECRET: ${NAIVE_CONNECT_SECRET}
+  TRAEFIK_NAIVE_PROXY_AUTH: ${NAIVE_PROXY_AUTH}
+```
+
+An unset or empty variable disables its matching condition. If neither condition matches, Traefik returns `501 Not Implemented` before HTTP routing. Other HTTP methods are unaffected. Values are read when the HTTP server handler is created; restart Traefik after changing the environment.
+
+Keep the existing HTTP routers that exactly match these headers and select the NaiveProxy service on port 8080. Set each router's header value to the corresponding environment variable value. The backend can continue to run `naive --listen=http://0.0.0.0:8080 --log`. Passing this check only permits HTTP routing; it does not select a service or replace router matching.
+
+CONNECT tunneling remains unsupported upstream. This patch does not establish correct HTTP/2 or HTTP/3 tunnel shutdown, flow control, or resource cleanup. Review the routing, middleware, proxy, and transport code and retest tunneling before every version upgrade.
+
+### Publish the Docker Image
+
+The [Build Docker workflow](.github/workflows/build-docker.yaml) runs on pushes and manual dispatches. It builds the WebUI and binary with the repository's build settings and publishes only `linux/amd64` to `acedroidx/traefik_with_connect_method:<version>`.
+
+Set the repository Actions secrets `DOCKER_USERNAME` and `DOCKER_PASSWORD` (a Docker Hub access token with write permission). The workflow reads the branch name as the build version and image tag, for example `v3.7.16`. For a manual run, select the version branch to build. The branch name must be a valid Docker image tag. The same value is embedded in the binary and used as the image tag.
+
+---
 
 <p align="center">
     <picture>
